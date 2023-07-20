@@ -4,8 +4,7 @@ A python library for the shared tools to create the pipelines that run sets of s
 
 ## Usage
 
-```
-python
+```python
 import pipeline
 pipeline = Pipeline()
 ```
