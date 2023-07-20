@@ -1,0 +1,12 @@
+[project]
+name = "pipeline"
+version = "0.1"
+description = "A python library for the shared tools to create the pipelines that run sets of steps to create a specific dataset for a specific microservice."
+readme = "README.md"
+authors = [{name = "Chris Thorpe"}]
+license = {text = "Apache-2.0"}
+classifiers = [
+    "Development Status :: 2 - Pre-Alpha"
+]
+# ...
+dependencies = []
