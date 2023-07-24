@@ -66,12 +66,12 @@ def get_dependencies(filename:str, file_type:str) -> Dict:
     elif file_type == 'PIPENV':
         this_file_type = filetypes.pipfile
     elif file_type == 'CONDA':
-        this_file_type = filetype.conda_yml
+        this_file_type = filetypes.conda_yml
 
-    with open('Pipfile','r') as file:
-        pipfile = parse(file.read(), file_type=this_file_type)
-    json_pipfile = json.loads(pipfile.json())
-    dependencies = [dependency['name'] for dependency in json_pipfile['dependencies']]
+    with open(filename,'r') as filehandle:
+        dependency_file = parse(filehandle.read(), file_type=this_file_type)
+    json_dependencies = json.loads(dependency_file.json())
+    dependencies = [dependency['name'] for dependency in json_dependencies['dependencies']]
     versions = [version(dependency) for dependency in dependencies]
     return {k:v for k,v in zip(dependencies,versions)}
 
@@ -152,8 +152,15 @@ class Pipeline():
     def initialise(self, **kwargs):
         """
         """
-        print ('Initialising')
+        started_at = get_current_time()
+
         self.repository_name, self.pipeline_version, self.pipeline_name = get_repository_info()
+
+        self.console.print ("")
+        self.console.rule(title="Initialising...")
+        self.console.print ("")
+        self.console.print (f"{self.pipeline_name} (commit sha : {self.pipeline_version}) started at {started_at}")
+        self.console.print ("")
 
         if self.release:
             # switch the output directory to the warehouse
@@ -163,7 +170,6 @@ class Pipeline():
             self.output_path = self.config['PATHS']['OUTPUT_PATH']
             self.log_path = self.config['PATHS']['LOG_PATH']
 
-        started_at = get_current_time()
         self.action_logs = {
             'started_at': started_at,
             'steps':{},
@@ -174,12 +180,39 @@ class Pipeline():
         
         print (self.action_logs)
         self.action_logs['steps']['create_base_folders'] = self.create_base_folder_structure()
-        
+    
+
+    def bundle_dependency_list(self):
+        dependencies = {}
+        for dependency_type in self.config['DEPENDENCIES']:
+            dependencies[dependency_type.lower()] = get_dependencies(self.config['DEPENDENCIES'][dependency_type], dependency_type)
+        return dependencies
+
+
+    def finalise(self):
+        """
+        """
+        self.action_logs['dependencies'] = self.bundle_dependency_list()
+        self.action_logs['completed_at'] = get_current_time()
+        start = datetime.datetime.fromisoformat(self.action_logs['started_at'])
+        end = datetime.datetime.fromisoformat(self.action_logs['completed_at'])
+        delta = end - start
+        datehash = hashlib.sha256(self.action_logs['completed_at'].encode('utf-8')).hexdigest()
+        logfilename = f"{self.log_path}/{self.repository_name}-{datehash}.json"
+        with open(logfilename, 'w') as logfile:
+            logfile.write(json.dumps(self.action_logs, sort_keys=True, indent=4))
+        self.console.print(f"Pipeline completed at {self.action_logs['completed_at']} : Execution time : {delta}") 
+        return self.action_logs
 
 
     def load_steps(self, steps:Dict):
         self.steps = steps
-        self.console.print (steps)
+        self.console.rule(title=f"Running {self.pipeline_name}")
+        self.console.print ("")
+        self.console.print(f"There are {len(self.steps)} steps to this pipeline")
+        for step in self.steps:
+            self.console.print(f"{step}. {self.steps[step]['list_item']}")
+        self.console.print("")
         pass
 
     def get_kwargs(self):
