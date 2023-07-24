@@ -1,4 +1,4 @@
-from typing import Dict, List, Optional, Union
+from typing import Dict, List, Tuple, Optional, Union
 
 import toml
 import json
@@ -207,7 +207,12 @@ class Pipeline():
         }
         
         print (self.action_logs)
-        self.action_logs['steps']['create_base_folders'] = self.create_base_folder_structure()
+        step_number = 0
+        substep_number = None
+        step_title_number = self.get_step_title_number(step_number, substep_number)
+        action_output = self.create_base_folder_structure()
+        action_log = self.build_action_log(step_number, substep_number, started_at, None, action_output, action_name='create_base_folder_structure')
+        self.action_logs['steps'][step_title_number] = action_log
     
 
     def bundle_dependency_list(self) -> Dict:
@@ -267,6 +272,79 @@ class Pipeline():
         return {k:v for k,v in self.kwargs.items()}
 
 
+    def build_action_log(self, step_number:int, substep_number:Union[int, None], started_at:str, additional_args:Union[Dict,None], action_output:Dict, action_name:str=None) -> Dict:
+        """
+        This function builds an action log to a consistent structure from some inputs and outputs
+
+        Args:
+            step_number (int): the step number e.g. 1
+            substep_number (int): the substep number, None if not a multipart step
+            started_at (str): an isoformatted string for the datetime of when the step was started
+            additional_args (Dict): a dictionary of additional arguments for multipart steps
+            action_output (Dict): the output of a step
+
+        Returns:
+            Dict: the structured action log
+        """
+        if not action_name:
+            action_name = self.steps[step_number]['function'].__name__
+        return {
+            'step': step_number,
+            'substep_number': substep_number,
+            'step_action': action_name,
+            'started_at':started_at,
+            'completed_at': get_current_time(),
+            'arguments': additional_args,
+            'action_output': action_output
+        }
+
+
+    def get_step_title_number(self, step_number:int, substep_number:Union[int, None]) -> str:
+        """
+        This structure generates a step title number. If there is no substep number it just returns a string of the step_number
+
+        Otherwise it returns a number of the form step_number.substep_number
+
+        Args:
+            step_number (int): the step number e.g. 1
+            substep_number (int): the substep number, None if not a multipart step
+            additional_args (Dict): a dictionary of additional arguments for multipart steps
+            kwargs (Dict): the keyword arguments from the CLI with additional variables such as config
+
+        Returns:
+            str : step_title_number, the title number for the step, also used as the key for the step in the combined log
+        """
+        if substep_number:
+            step_title_number = f"{step_number}.{substep_number}"
+        else:
+            step_title_number = str(step_number)
+        return step_title_number
+
+
+    def run(self, step_number, substep_number, additional_args, **kwargs) -> Tuple[str,Dict]:
+        """
+        A function to perform the execution of a particular step or substep
+
+        Args:
+            step_number (int): the step number e.g. 1
+            substep_number (int): the substep number, None if not a multipart step
+
+        Returns:
+            str: the step_title_number
+            Dict: the action_output of the step
+        """
+
+        started_at = get_current_time()
+        step_title_number = self.get_step_title_number(step_number, substep_number)
+        self.console.rule(title=f"{step_title_number}. {self.steps[step_number]['title_template'].format(**kwargs)}")
+        with console.status(f"Running step {step_title_number}..."):
+            step_function = self.steps[str(step_number)]['function']
+            action_output = step_function(**kwargs)
+        console.print(f"Step {step_title_number} completed.\nOutput:")
+        console.print (action_output)
+        return step_title_number, self.build_action_log(step_number, substep_number, started_at, additional_args, action_output)
+
+
     def run_step(self, step_number:int) -> List:
         """
         This function runs the function associated with the step number, using the paramaters from the keyword arguments.
@@ -281,17 +359,23 @@ class Pipeline():
         # TODO refactor to bring in some of the complexity from the allele pipeline implementation of Pipeline
         kwargs = self.get_kwargs()
         kwargs['config'] = self.config 
+        
         action_log_items = []
         if self.steps[str(step_number)]['is_multi']:
+            # TODO multistep action logging, refactor all of this when you have a real multistep function to work with
             print ('MULTISTEP')
             print (f"multistep parameter : {self.steps[str(step_number)]['multi_param']}")
             print (f"multistep options : {self.steps[str(step_number)]['multi_options']}")
             for item in self.steps[str(step_number)]['multi_options']:
                 kwargs[self.steps[str(step_number)]['multi_param']] = item
-                action_log_items.append(self.steps[str(step_number)]['function'](**kwargs))
+                action_log = self.steps[str(step_number)]['function'](**kwargs)
+                action_log_items.append(action_log)
         else:
-            action_log_items.append(self.steps[str(step_number)]['function'](**kwargs))
-        self.action_logs[str(step_number)] = action_log_items
+            substep_number = None
+            additional_args = None
+            step_title_number, action_log = self.run(step_number, substep_number, additional_args, **kwargs)
+            self.action_logs['steps'][step_title_number] = action_log
+            action_log_items.append(action_log)  
         return action_log_items
 
 
