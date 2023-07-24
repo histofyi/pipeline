@@ -55,12 +55,30 @@ def create_folder(folder_path:str, verbose:bool) -> str:
 
 
 def get_current_time() -> str:
+    """
+    This function simply returns the current datetime in isoformat
+
+    Returns:
+        str: the current datetime as an isoformat string
+    """
     return datetime.datetime.now().isoformat()
 
 
 def get_dependencies(filename:str, file_type:str) -> Dict:
-    # the file_type is the key name in the dependencies.toml file
+    """
+    This function reads a specific dependency file e.g. requirements.txt 
+    This file is specified in the dependencies.toml config file
+    The fun returns a dictionary of the dependencies amd the currently installed versions
 
+    Args:
+        filename (str): the filename for the dependencies file e.g. requirements.txt
+        file_type (str): the type of dependencies file. This is the keyname from the toml file and so is always uppercased to show it's a configuration constant
+    
+    Returns:
+        Dict : the dictionary of dependencies and their version numbers
+    """
+
+    # the file_type is the key name in the dependencies.toml file
     if file_type == 'PIP':
         this_file_type = filetypes.requirements_txt
     elif file_type == 'PIPENV':
@@ -68,15 +86,22 @@ def get_dependencies(filename:str, file_type:str) -> Dict:
     elif file_type == 'CONDA':
         this_file_type = filetypes.conda_yml
 
+    # read the dependencies file
     with open(filename,'r') as filehandle:
         dependency_file = parse(filehandle.read(), file_type=this_file_type)
-    json_dependencies = json.loads(dependency_file.json())
-    dependencies = [dependency['name'] for dependency in json_dependencies['dependencies']]
+    
+    # create an array of the dependency names
+    dependencies = [dependency['name'] for dependency in json.loads(dependency_file.json())['dependencies']]
+    # create an array of the versions
     versions = [version(dependency) for dependency in dependencies]
+    # return a dictionary of the dependencies and versions
     return {k:v for k,v in zip(dependencies,versions)}
 
 
-def get_repository_info():
+def get_repository_info() -> Union[str,str,str]:
+    """
+    This function retrieves information about the current git repository
+    """
     repo = git.Repo(search_parent_directories=True)
     repository_name = repo.remotes.origin.url.split('.git')[0].split('/')[-1]
     pipeline_version = repo.head.object.hexsha
@@ -88,29 +113,27 @@ class Pipeline():
     """
     This class provides methods and internal variable storage to allow the processing of datasets
     """
-    
     def __init__(self):
         """
+        This function loads some initial setup data from configuration and from command line arguments and initialises the pipeline
         """
-        print ('__INIT__')
         self.console = Console()
         self.config = self.load_config()
         self.kwargs = self.parse_cli_args()
         self.verbose = self.kwargs['verbose']
-
-        print (self.verbose)
+        self.force = self.kwargs['force']
         self.release = self.kwargs['release']
         self.logoutput = True
         self.initialise(**self.kwargs)
         pass
 
 
-    def load_config(self):
+    def load_config(self) -> Dict:
         """ 
-        Loads the configuration file for the pipline and returns a dictionary of values
+        This function loads the configuration file for the pipline, traverses the contained configuration files and returns a dictionary of values
 
         Returns:
-            dict: a dictionary of configuration variables 
+            Dict: a dictionary of configuration variables 
 
         """
         config = {}
@@ -126,8 +149,12 @@ class Pipeline():
         return config
 
 
-    def parse_cli_args(self):
+    def parse_cli_args(self) -> Dict:
         """
+        This function loads the configuration dictionary, sets up argparse and parses the command line arguments and returns a dictionary of values
+        
+        Returns:
+            Dict: a dictionary of command line arguments and variables
         """
         arguments = [value for key, value in self.config['ARGPARSE']['ARGUMENTS'].items()]
 
@@ -142,15 +169,16 @@ class Pipeline():
                 action=argument['ACTION'])
 
         parser.set_defaults(**{argument['VARIABLE_NAME']:argument['DEFAULT'] for argument in arguments})
-        
         kwargs = vars(parser.parse_args())
-        
-        self.console.print(kwargs)
         return kwargs
 
 
     def initialise(self, **kwargs):
         """
+        This function sets up the action_logs dictionary which is written out to be a log file, creates the intital set of base folders specifited in config
+
+        It is also responsible for setting output folders
+        #TODO think about whether some of these steps would be better suited to be split out to individual functions called from __init__()
         """
         started_at = get_current_time()
 
@@ -182,15 +210,25 @@ class Pipeline():
         self.action_logs['steps']['create_base_folders'] = self.create_base_folder_structure()
     
 
-    def bundle_dependency_list(self):
+    def bundle_dependency_list(self) -> Dict:
+        """
+        This function iterates through the individual sets of dependencies in the configuration and returns a dictionary of them
+
+        Returns:
+            Dict: a dictionary of the dependencies
+        """
         dependencies = {}
         for dependency_type in self.config['DEPENDENCIES']:
             dependencies[dependency_type.lower()] = get_dependencies(self.config['DEPENDENCIES'][dependency_type], dependency_type)
         return dependencies
 
 
-    def finalise(self):
+    def finalise(self) -> Dict:
         """
+        This function logs the dependencies in the action_logs variable, sets a completed_at time and writes the logfile, and outputs it in the return
+
+        Returns:
+            Dict: the action_logs log dictionary
         """
         self.action_logs['dependencies'] = self.bundle_dependency_list()
         self.action_logs['completed_at'] = get_current_time()
@@ -206,6 +244,9 @@ class Pipeline():
 
 
     def load_steps(self, steps:Dict):
+        """
+        This function takes the steps dictionary as input which contains information about individual steps including the function name to perform
+        """
         self.steps = steps
         self.console.rule(title=f"Running {self.pipeline_name}")
         self.console.print ("")
@@ -215,14 +256,29 @@ class Pipeline():
         self.console.print("")
         pass
 
-    def get_kwargs(self):
-        print (self.kwargs)
+
+    def get_kwargs(self) -> Dict:
+        """
+        This function provides a clean dictionary of keyword arguments from those stored in the self.kwargs variable
+
+        Returns:
+            Dict: a dictionary of keyword arguments
+        """
         return {k:v for k,v in self.kwargs.items()}
 
 
-    def run_step(self, step_number:int):
+    def run_step(self, step_number:int) -> List:
         """
+        This function runs the function associated with the step number, using the paramaters from the keyword arguments.
+
+        In the case of multi part steps, where the function is repeated with different parameters, these additional parameters come from the muli_param and multi_options parameters in the step
+
+        An example of this is processing different loci
+
+        Returns:
+            List: a list of the outputs of the step
         """
+        # TODO refactor to bring in some of the complexity from the allele pipeline implementation of Pipeline
         kwargs = self.get_kwargs()
         kwargs['config'] = self.config 
         action_log_items = []
@@ -234,8 +290,8 @@ class Pipeline():
                 kwargs[self.steps[str(step_number)]['multi_param']] = item
                 action_log_items.append(self.steps[str(step_number)]['function'](**kwargs))
         else:
-            print ('SINGLESTEP')
             action_log_items.append(self.steps[str(step_number)]['function'](**kwargs))
+        self.action_logs[str(step_number)] = action_log_items
         return action_log_items
 
 
@@ -250,9 +306,7 @@ class Pipeline():
         Returns:
             Dict : a dictionary of actions performed 
         """
-
         # default action log file for this step
-        print ('Creating base folder structure')
         action_log = {
             'folders_created':[],
             'folders_in_existence':[], 
@@ -260,7 +314,7 @@ class Pipeline():
         }
 
         folders = ['input','output','tmp','log']
-
+        self.console.print ('Creating base folder structure')
         for folder in folders:
             folder_status = create_folder(folder, self.verbose)
             action_log[folder_status].append(folder)
