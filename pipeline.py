@@ -169,8 +169,8 @@ class Pipeline():
             config[file] = {}
             for k,v in this_config.items():
                 config[file][k] = v
-        self.console.print("Configuration")
-        self.console.print (config)
+        #self.console.print("Configuration")
+        #self.console.print (config)
         return config
 
 
@@ -232,7 +232,6 @@ class Pipeline():
             'system_info': get_system_info()
         }
         
-        print (self.action_logs)
         step_number = 0
         substep_number = None
         step_title_number = self.get_step_title_number(step_number, substep_number)
