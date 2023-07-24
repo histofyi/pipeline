@@ -114,7 +114,13 @@ def get_repository_info() -> Union[str,str,str]:
     return repository_name, pipeline_version, pipeline_name
 
 
-def get_system_info():
+def get_system_info() -> Union[Dict, None]:
+    """
+    This function returns information on the computer hardware running this particular instance of the pipeline
+
+    Returns:
+        Dict: a dictionary of information on the system
+    """
     try:
         info={}
         info['platform']=platform.system()
