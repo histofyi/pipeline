@@ -5,6 +5,8 @@ import json
 import os
 from pathlib import Path
 
+import platform,socket,re,uuid
+
 import argparse
 
 # used to obtain repository and version info - the version is the git commit hash
@@ -109,6 +111,20 @@ def get_repository_info() -> Union[str,str,str]:
     return repository_name, pipeline_version, pipeline_name
 
 
+def get_system_info():
+    try:
+        info={}
+        info['platform']=platform.system()
+        info['platform-release']=platform.release()
+        info['platform-version']=platform.version()
+        info['architecture']=platform.machine()
+        info['hostname']=socket.gethostname()
+        info['processor']=platform.processor()
+    except:
+        info = None
+    return info
+
+
 class Pipeline():
     """
     This class provides methods and internal variable storage to allow the processing of datasets
@@ -203,7 +219,8 @@ class Pipeline():
             'steps':{},
             'repository_name': self.repository_name,
             'pipeline_name': self.pipeline_name,
-            'pipeline_version': self.pipeline_version
+            'pipeline_version': self.pipeline_version,
+            'system_info': get_system_info()
         }
         
         print (self.action_logs)
