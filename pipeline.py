@@ -5,7 +5,6 @@ import json
 import os
 from pathlib import Path
 
-import platform,socket,re,uuid
 
 import argparse
 
@@ -17,6 +16,10 @@ from importlib.metadata import version
 
 # used to parse requirements files
 from dparse import parse, filetypes
+
+# used to obtain system info on the machine running the pipeline
+import platform
+
         
 import datetime
 import hashlib
@@ -118,7 +121,7 @@ def get_system_info():
         info['platform-release']=platform.release()
         info['platform-version']=platform.version()
         info['architecture']=platform.machine()
-        info['hostname']=socket.gethostname()
+        info['hostname']=platform.node()
         info['processor']=platform.processor()
     except:
         info = None
