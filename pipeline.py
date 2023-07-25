@@ -362,8 +362,13 @@ class Pipeline():
         started_at = get_current_time()
         step_title_number = self.get_step_title_number(step_number, substep_number)
         self.console.rule(title=f"{step_title_number}. {self.steps[step_number]['title_template'].format(**kwargs)}")
-        with console.status(f"Running step {step_title_number}..."):
-            step_function = self.steps[str(step_number)]['function']
+        
+        step_function = self.steps[str(step_number)]['function']
+            
+        if not self.steps[str(step_number)]['has_progress']:
+            with console.status(f"Running step {step_title_number}..."):
+                action_output = step_function(**kwargs)
+        else:
             action_output = step_function(**kwargs)
         console.print(f"Step {step_title_number} completed.\nOutput:")
         console.print (action_output)
@@ -384,7 +389,9 @@ class Pipeline():
         # TODO refactor to bring in some of the complexity from the allele pipeline implementation of Pipeline
         kwargs = self.get_kwargs()
         kwargs['config'] = self.config 
-        
+        kwargs['output_path'] = self.output_path
+        kwargs['console'] = self.console
+
         action_log_items = []
         if self.steps[str(step_number)]['is_multi']:
             # TODO multistep action logging, refactor all of this when you have a real multistep function to work with
