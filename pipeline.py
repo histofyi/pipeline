@@ -69,6 +69,10 @@ def get_current_time() -> str:
     return datetime.datetime.now().isoformat()
 
 
+def get_date_hash(isoformat_date:str) -> str:
+    return hashlib.sha256(isoformat_date.encode('utf-8')).hexdigest()
+
+
 def get_dependencies(filename:str, file_type:str) -> Dict:
     """
     This function reads a specific dependency file e.g. requirements.txt 
@@ -265,7 +269,7 @@ class Pipeline():
         start = datetime.datetime.fromisoformat(self.action_logs['started_at'])
         end = datetime.datetime.fromisoformat(self.action_logs['completed_at'])
         delta = end - start
-        datehash = hashlib.sha256(self.action_logs['completed_at'].encode('utf-8')).hexdigest()
+        datehash = get_date_hash(self.action_logs['completed_at'])
         logfilename = f"{self.log_path}/{self.repository_name}-{datehash}.json"
         with open(logfilename, 'w') as logfile:
             logfile.write(json.dumps(self.action_logs, sort_keys=True, indent=4))
