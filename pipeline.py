@@ -5,7 +5,6 @@ import json
 import os
 from pathlib import Path
 
-
 import argparse
 
 # used to obtain repository and version info - the version is the git commit hash
@@ -23,9 +22,13 @@ import platform
         
 import datetime
 import hashlib
+from base64 import urlsafe_b64encode
 
 from rich.console import Console
 console = Console()
+
+
+
 
 
 def create_folder(folder_path:str, verbose:bool) -> str:
@@ -70,7 +73,7 @@ def get_current_time() -> str:
 
 
 def get_date_hash(isoformat_date:str) -> str:
-    return hashlib.sha256(isoformat_date.encode('utf-8')).hexdigest()
+    return datetime.datetime.fromisoformat(isoformat_date).strftime('%Y%m%d%H%M%S')
 
 
 def get_dependencies(filename:str, file_type:str) -> Dict:
@@ -210,6 +213,7 @@ class Pipeline():
         #TODO think about whether some of these steps would be better suited to be split out to individual functions called from __init__()
         """
         started_at = get_current_time()
+        self.datehash = get_date_hash(started_at)
 
         self.repository_name, self.pipeline_version, self.pipeline_name = get_repository_info()
 
@@ -228,6 +232,7 @@ class Pipeline():
             self.log_path = self.config['PATHS']['LOG_PATH']
 
         self.action_logs = {
+            'datehash': self.datehash,
             'started_at': started_at,
             'steps':{},
             'repository_name': self.repository_name,
@@ -269,8 +274,7 @@ class Pipeline():
         start = datetime.datetime.fromisoformat(self.action_logs['started_at'])
         end = datetime.datetime.fromisoformat(self.action_logs['completed_at'])
         delta = end - start
-        datehash = get_date_hash(self.action_logs['completed_at'])
-        logfilename = f"{self.log_path}/{self.repository_name}-{datehash}.json"
+        logfilename = f"{self.log_path}/{self.repository_name}-{self.datehash}.json"
         with open(logfilename, 'w') as logfile:
             logfile.write(json.dumps(self.action_logs, sort_keys=True, indent=4))
         self.console.print(f"Pipeline completed at {self.action_logs['completed_at']} : Execution time : {delta}") 
@@ -395,6 +399,8 @@ class Pipeline():
         kwargs['config'] = self.config 
         kwargs['output_path'] = self.output_path
         kwargs['console'] = self.console
+        kwargs['datehash'] = self.datehash
+        kwargs['function_name'] = self.steps[str(step_number)]['function'].__name__
 
         action_log_items = []
         if self.steps[str(step_number)]['is_multi']:
