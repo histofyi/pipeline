@@ -289,8 +289,8 @@ class Pipeline():
         self.console.rule(title=f"Running {self.pipeline_name}")
         self.console.print ("")
         self.console.print(f"There are {len(self.steps)} steps to this pipeline")
-        for step in self.steps:
-            self.console.print(f"{step}. {self.steps[step]['list_item']}")
+        for step_number in self.steps:
+            self.console.print(f"{step_number}. {self.steps[step_number]['title_verb'][1]} {self.steps[step_number]['title_template']}")
         self.console.print("")
         pass
 
@@ -369,7 +369,7 @@ class Pipeline():
 
         started_at = get_current_time()
         step_title_number = self.get_step_title_number(step_number, substep_number)
-        self.console.rule(title=f"{step_title_number}. {self.steps[step_number]['title_template'].format(**kwargs)}")
+        self.console.rule(title=f"{step_title_number}. {self.steps[step_number]['title_verb'][0]} {self.steps[step_number]['title_template'].format(**kwargs)}")
         
         step_function = self.steps[str(step_number)]['function']
             
