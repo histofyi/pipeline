@@ -401,6 +401,7 @@ class Pipeline():
         kwargs['console'] = self.console
         kwargs['datehash'] = self.datehash
         kwargs['function_name'] = self.steps[str(step_number)]['function'].__name__
+        kwargs['has_progress'] = self.steps[str(step_number)]['has_progress']
 
         action_log_items = []
         if self.steps[str(step_number)]['is_multi']:
